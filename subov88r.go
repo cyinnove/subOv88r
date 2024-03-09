@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -18,60 +19,53 @@ const (
 )
 
 func main() {
+	// Parse command-line arguments
 	filepath := flag.String("f", "", "Path to the subdomains file")
 	flag.Parse()
 
-	// check for provided subdomains file
+	// Check for provided subdomains file
 	if *filepath == "" {
-		fmt.Println("Usage: subov88r -filepath subdomains.txt")
+		fmt.Println("Usage: subov88r -f subdomains.txt")
 		os.Exit(88)
 	}
 
-	// open subdomains file
+	// Open subdomains file
 	file, err := os.Open(*filepath)
 	if err != nil {
-		fmt.Println("Error While Opening a file:", err)
-		return
+		fmt.Println("Error while opening file:", err)
+		os.Exit(1)
 	}
 	defer file.Close()
 
-	// loop over the list of the subdomains
+	// Loop over the list of subdomains
 	scanner := bufio.NewScanner(file)
-
 	for scanner.Scan() {
 		subdomain := scanner.Text()
-		cname, err := getCname(subdomain)
+
+		// Get the CNAME record for the subdomain
+		cname, err := net.LookupCNAME(subdomain)
 		if err != nil {
-			fmt.Printf("Error getting CNAME for %s: %v\n", subdomain, err)
-			continue
+			return
 		}
 
+		// Get the status of the subdomain
 		status, err := getStatus(subdomain)
 		if err != nil {
 			fmt.Printf("Error getting status for %s: %v\n", subdomain, err)
 			continue
 		}
 
-		fmt.Printf("%sSubdomain: %s %s, %s CNAME: %s %s, %sStatus: %s%s\n", Red, subdomain, NC, Blue, cname, NC, Green, status, NC)
+		// Print results with ANSI colors
+		fmt.Printf("%sSubdomain: %s %s, %sCNAME: %s %s, %sStatus: %s%s\n", Red, subdomain, NC, Blue, cname, NC, Green, status, NC)
 	}
 }
 
-// queries the CNAME record for a given subdomain
-func getCname(subdomain string) (string, error) {
-	cmd := exec.Command("dig", "+short", subdomain, "CNAME")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("Error while running $ dig +short %s CNAME: %v", subdomain, err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-// Get the status from the dig output
+// getStatus gets the status from the dig output
 func getStatus(subdomain string) (string, error) {
 	cmd := exec.Command("dig", subdomain)
 	digResult, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("Error while running dig for %s: %v", subdomain, err)
+		return "", err
 	}
 
 	digOutput := string(digResult)
