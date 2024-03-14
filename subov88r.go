@@ -57,8 +57,7 @@ func main() {
 		isVuln := azureSTO(cname, status)
 
 		if isVuln {
-			fmt.Printf("[%v,%v,%v] Possiply Vulnerable to subdomain takevover", subdomain, cname, status)
-			continue
+			fmt.Printf("[%v, %v, %v] Possiply Vulnerable to subdomain takeover vulnerability", subdomain, cname, status)
 		}
 
 		// Print results with ANSI colors
@@ -97,7 +96,7 @@ func azureSTO(cname string, status string) bool {
 		url := fmt.Sprintf("https://%s", cname)
 		_, err := http.Get(url)
 		if err != nil {
-			return true // If there's an error, assume it's a possible subdomain takeover
+			return true
 		}
 	}
 	return false
