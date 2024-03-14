@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -43,15 +45,19 @@ func main() {
 		subdomain := scanner.Text()
 
 		// Get the CNAME record for the subdomain
-		cname, err := net.LookupCNAME(subdomain)
-		if err != nil {
-			return
-		}
+		cname, _ := net.LookupCNAME(subdomain)
 
 		// Get the status of the subdomain
 		status, err := getStatus(subdomain)
 		if err != nil {
 			fmt.Printf("Error getting status for %s: %v\n", subdomain, err)
+			continue
+		}
+
+		isVuln := azureSTO(cname, status)
+
+		if isVuln {
+			fmt.Printf("[%v,%v,%v] Possiply Vulnerable to subdomain takevover", subdomain, cname, status)
 			continue
 		}
 
@@ -81,4 +87,18 @@ func getStatus(subdomain string) (string, error) {
 		}
 	}
 	return status, nil
+}
+
+// function that check for subdomain takeover in azure services
+func azureSTO(cname string, status string) bool {
+	azureRegex := regexp.MustCompile(`(?i)^(?:[a-z0-9-]+\.)?(?:cloudapp\.net|azurewebsites\.net|cloudapp\.azure\.com)$`)
+
+	if strings.Contains(status, "NXDOMAIN") && azureRegex.MatchString(cname) {
+		url := fmt.Sprintf("https://%s", cname)
+		_, err := http.Get(url)
+		if err != nil {
+			return true // If there's an error, assume it's a possible subdomain takeover
+		}
+	}
+	return false
 }
